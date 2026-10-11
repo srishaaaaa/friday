@@ -1,0 +1,19 @@
+node_modules/
+dist/
+dist-electron/
+release/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/dist/
+backend/build/
+.env
+*.db
+*.db-wal
+*.db-shm
+*.egg-info/
+*.log
+
+# Kept local only (not published)
+/README.md
