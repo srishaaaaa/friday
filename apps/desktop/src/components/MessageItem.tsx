@@ -120,6 +120,8 @@ function ImageThumb({ a, onOpen }: { a: Attachment; onOpen?(): void }) {
   )
 }
 
+const fmtSecs = (ms?: number | null) => (ms == null ? '—' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`)
+
 function fmtTime(iso?: string) {
   if (!iso) return null
   const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`)
@@ -195,6 +197,11 @@ export const MessageItem = memo(function MessageItem({ m, isLast, isLastUser = f
           <p className="mb-1.5 flex items-center gap-1.5 text-xs text-faint">
             {where.remote ? <Cloud size={12} /> : <Cpu size={12} />}
             <span>{where.label}{m.model ? ` · ${m.model}` : ''}</span>
+            {m.usage?.total_ms != null && (
+              <span className="font-mono" title={`First word after ${fmtSecs(m.usage.first_token_ms)} · finished in ${fmtSecs(m.usage.total_ms)}`}>
+                · {fmtSecs(m.usage.first_token_ms ?? m.usage.total_ms)}
+              </span>
+            )}
           </p>
         )}
         {activity.length > 0 && (

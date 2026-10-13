@@ -1,5 +1,6 @@
 import { Command, Minus, Pin, PinOff, Square, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { FridayLogo } from './FridayLogo'
 import { StatusDot, type Health } from './ui/primitives'
 
 /** Frameless window chrome: drag region, connection indicator, palette hint and window controls. */
@@ -18,6 +19,7 @@ export function TitleBar({ status, statusText, onPalette }: { status: Health; st
     // z-[95]: above dialogs/onboarding (z-modal 80) so the window can always be moved, minimized or closed.
     <div className="drag relative z-[95] flex h-9 shrink-0 items-center justify-between pl-4 text-xs text-mute">
       <div className="flex items-center gap-2.5">
+        <FridayLogo size={18} glow={false} />
         <StatusDot status={status} label={statusText} />
         <span className="font-medium">{statusText}</span>
       </div>

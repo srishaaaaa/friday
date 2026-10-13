@@ -75,7 +75,7 @@ async def test_attachment_flow_is_private_and_reaches_the_model(client, provider
     meta = ev[0][1]
     assert meta["leaves_device"] is False and "Reading 1 attached file" in meta["activity"]
     sent, _ = providers["ollama"].calls[-1]
-    assert "secret launch date: May 3" in sent[-1].content and sent[-1].content.endswith("When is launch?")
+    assert "secret launch date: May 3" in sent[-1].content and "When is launch?" in sent[-1].content
     conv = (await client.get(f"/api/conversations/{meta['conversation_id']}")).json()
     assert conv["messages"][0]["attachments"][0]["name"] == "plan.txt"
     # already sent → cannot be deleted individually or reused
@@ -141,8 +141,15 @@ async def test_personality_and_generation_settings_change_the_request(client, pr
     assert sysmsg.startswith(DEFAULT_SYSTEM_PROMPT[:60])
     assert "Personality: concise" in sysmsg and "Do not use humor" in sysmsg
     assert '"Sri"' in sysmsg and "British English" in sysmsg
-    assert "table" in sysmsg  # comparison intent guidance
-    assert opts == {"timeout": 60.0, "temperature": 0.3, "top_p": 0.9, "num_ctx": 8192}
+    # per-message guidance rides on the user turn, so the system prompt stays cacheable
+    sent, _ = providers["ollama"].calls[-1]
+    assert "Response guidance:" in sent[-1].content and "table" in sent[-1].content and "For this message" not in sysmsg
+    assert opts == {"timeout": 60.0, "temperature": 0.3, "top_p": 0.9, "num_ctx": 8192, "think": False, "keep_alive": "30m"}
+    await _send(client, "req-per-0002", message="hello again, how are you")
+    assert providers["ollama"].last_system == sysmsg  # identical prefix across different kinds of message
+    await _prefs(client, reasoning=True, keep_alive_minutes=120)
+    await _send(client, "req-per-0003", message="hi")
+    assert "think" not in providers["ollama"].last_options and providers["ollama"].last_options["keep_alive"] == "120m"
     # nullable settings can be reset to the model default
     await client.patch("/api/settings", json={"temperature": None})
     assert (await client.get("/api/settings")).json()["temperature"] is None

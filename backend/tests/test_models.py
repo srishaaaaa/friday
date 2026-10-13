@@ -83,3 +83,23 @@ async def test_reasoning_that_exhausts_the_budget_is_explained():
         raise AssertionError("expected ProviderError")
     except ProviderError as exc:
         assert exc.code == "reasoning_budget" and "Maximum response length" in exc.message
+
+
+async def test_reply_timing_is_recorded(client, providers):
+    r = await client.patch("/api/settings", json={"ollama_model": "llama3", "default_mode": "local"})
+    assert r.status_code == 200
+    from tests.conftest import parse_sse
+    ev = parse_sse((await client.post("/api/chat/stream", json={"request_id": "req-time-0001", "message": "hi"})).text)
+    usage = ev[-1][1]["usage"]
+    assert usage["first_token_ms"] is not None and usage["total_ms"] >= usage["first_token_ms"]
+
+
+async def test_warmup_uses_the_same_prompt_as_real_requests(client, providers, app):
+    await client.patch("/api/settings", json={"ollama_model": "llama3", "default_mode": "local"})
+    res = await app.state.chat.warmup()
+    assert res["warmed"] and providers["ollama"].last_options["keep_alive"] == "30m"
+    warm_system = providers["ollama"].last_system
+    await client.post("/api/chat/stream", json={"request_id": "req-warm-0001", "message": "hello"})
+    assert providers["ollama"].last_system == warm_system  # same prefix -> Ollama's prompt cache is reused
+    await client.patch("/api/settings", json={"ollama_model": "gemma4:cloud"})
+    assert (await app.state.chat.warmup())["warmed"] is False  # cloud models need no warm-up

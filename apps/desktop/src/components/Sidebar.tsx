@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import { dur, ease } from '../design/motion'
 import type { ConversationSummary } from '../types/api'
 import { groupByDate } from '../utils/dates'
-import { AIOrb, type OrbState } from './AIOrb'
+import type { OrbState } from './AIOrb'
+import { FridayLogo } from './FridayLogo'
 import { ConfirmDialog } from './ui/Dialog'
 import { MenuList, useDismiss } from './ui/Menu'
 import { Tooltip } from './ui/primitives'
@@ -106,7 +107,7 @@ export function Sidebar(p: Props) {
       {/* brand */}
       <div className={`flex items-center px-3 pb-2 pt-3 ${c ? 'flex-col gap-2' : 'justify-between'}`}>
         <div className="flex min-w-0 items-center gap-2.5 pl-0.5">
-          <AIOrb state={p.orb ?? 'idle'} size={32} detail={false} />
+          <FridayLogo size={32} />
           <AnimatePresence initial={false}>
             {!c && <motion.span key="wm" initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -6 }} transition={{ duration: dur.ui }}
               className="text-[1.05rem] font-extrabold tracking-[0.22em]">FRIDAY</motion.span>}

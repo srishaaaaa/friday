@@ -250,7 +250,7 @@ export function SettingsPanel({ open, settings, providers, models, prefs, initia
             onChange={(e) => setMaxTokens(e.target.value)}
             onBlur={() => { const n = Math.min(32000, Math.max(64, Number(maxTokens) || settings.max_tokens)); setMaxTokens(String(n)); if (n !== settings.max_tokens) onChange({ max_tokens: n }) }} />
         </Field>
-        <Field title="Context window (Ollama)" desc="Tokens Ollama keeps in view. Automatic sizes it to the conversation; larger values use more RAM. Hosted models ignore this.">
+        <Field title="Context window (Ollama)" desc="Tokens Ollama keeps in view. Automatic uses 8K and only grows for very long chats (each change makes Ollama reload the model). Larger values use more RAM. Hosted models ignore this.">
           <NumberOrDefault label="Context window" value={settings.context_window} min={2048} max={262144} step={2048} defaultLabel="Automatic" onChange={(v) => onChange({ context_window: v })} />
         </Field>
         <Field title="Request timeout" desc="Seconds to wait for the model before giving up.">
@@ -259,6 +259,13 @@ export function SettingsPanel({ open, settings, providers, models, prefs, initia
         </Field>
         <Field title="Retry once on temporary errors" desc="Retries the same provider once if it fails before any text arrives. FRIDAY never switches to a different provider on its own.">
           <Switch label="Retry once on temporary errors" checked={settings.auto_retry} onChange={(v) => onChange({ auto_retry: v })} />
+        </Field>
+        <Field title="Reasoning (thinking)" desc="Let models that support it think silently before answering. Better on hard problems, but much slower — on this PC it adds roughly 20–30 s per local reply. Off: answers start right away.">
+          <Switch label="Reasoning" checked={settings.reasoning} onChange={(v) => onChange({ reasoning: v })} />
+        </Field>
+        <Field title="Keep local model loaded" desc="Minutes the local model stays in memory after a reply. Reloading takes ~30–60 s on this PC; longer uses RAM for longer.">
+          <input className="field !w-24 text-right font-mono" type="number" min={1} max={1440} aria-label="Keep model loaded minutes" defaultValue={settings.keep_alive_minutes}
+            onBlur={(e) => { const n = Math.min(1440, Math.max(1, Number(e.target.value) || 30)); e.target.value = String(n); if (n !== settings.keep_alive_minutes) onChange({ keep_alive_minutes: n }) }} />
         </Field>
         <Field title="Stream responses" desc="Show text as it is generated. When off, the reply appears once complete.">
           <Switch label="Stream responses" checked={settings.streaming} onChange={(v) => onChange({ streaming: v })} />

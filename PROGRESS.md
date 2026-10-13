@@ -62,3 +62,12 @@ Not built: web search/citations, tool execution, OCR for scanned PDFs, per-messa
 * Picker shows exact ids + metadata + capability badges, refreshes on open and on window focus, warns when the
   selected model is no longer installed. Settings → AI providers: per-model Test / Test all.
 * Switching models only changes who answers next; the conversation (and its history) is untouched.
+
+## 2026-10-14 — logo + reply speed
+* Brand logo: `apps/desktop/build/friday-logo.png` (source), `icon.ico`/`icon.png`/`public/logo-mark.png` (mark crop) for the
+  window, shortcuts and favicon. In-app vector `FridayLogo` follows the theme accents (`brand` prop = original colors).
+* Measured latency (gemma4:e2b on CPU): cold 101 s → causes were model reloads (Ollama unload after 5 min; any num_ctx change),
+  hidden "thinking" (~25 s), and a system prompt that changed per message (busting Ollama's prompt cache, ~18 s).
+  Fixes: think=false unless Settings → Generation → Reasoning; keep_alive 30 min; stable num_ctx 8192 (16K/32K only if needed);
+  per-message guidance moved onto the user turn; background warm-up (`POST /api/chat/warmup`) on start and model/prompt changes.
+  Result: warm local first word 3–5 s (was ~27 s), cloud 1.2–2 s. Each reply stores first_token_ms / total_ms (shown in UI).

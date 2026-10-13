@@ -14,7 +14,7 @@ router = APIRouter(prefix="/conversations")
 
 def _msg(m) -> dict:  # noqa: ANN001
     return {"id": m.id, "role": m.role, "content": m.content, "status": m.status, "provider": m.provider,
-            "model": m.model, "route_reason": m.route_reason, "created_at": m.created_at, "feedback": m.feedback,
+            "model": m.model, "route_reason": m.route_reason, "created_at": m.created_at, "feedback": m.feedback, "usage": json.loads(m.usage_json) if m.usage_json else None,
             "attachments": [attachment_meta(a) for a in m.attachments],
             **_tools(m)}
 

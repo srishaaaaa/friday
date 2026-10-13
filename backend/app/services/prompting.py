@@ -135,7 +135,16 @@ TOOL_NOTE = (
 )
 
 
-def build_system_prompt(base: str, persona: Persona, intent: str, memory: str = "", tools: list[str] | None = None) -> str:
+def intent_guidance(intent: str, tools: list[str] | None = None) -> str:
+    """Per-message steering. Kept OUT of the system prompt so the prompt prefix stays identical between
+    messages and Ollama can reuse its cache (on CPU, re-reading ~900 prompt tokens costs ~18 s)."""
+    if intent == "research" and tools and "web_search" in tools:
+        return "Research-style request: search the web, read the most relevant results, and give an evidence-backed answer with [n] citations."
+    return GUIDANCE.get(intent, "")
+
+
+def build_system_prompt(base: str, persona: Persona, memory: str = "", tools: list[str] | None = None) -> str:
+    """Stable instructions: identical for every message until settings, memories or tools change."""
     style = [PERSONALITY.get(persona.personality, ""), WARMTH.get(persona.warmth, ""), HUMOR.get(persona.humor, ""),
              DETAIL.get(persona.detail, ""), DEPTH.get(persona.tech_depth, ""), FORMATTING.get(persona.formatting, ""),
              SUGGEST.get(persona.suggestions, "")]
@@ -143,11 +152,6 @@ def build_system_prompt(base: str, persona: Persona, intent: str, memory: str = 
     style_txt = " ".join(x for x in style if x)
     if style_txt:
         parts.append(f"Style preferences: {style_txt}")
-    guidance = GUIDANCE.get(intent, "")
-    if intent == "research" and tools and "web_search" in tools:
-        guidance = "Research-style request: search the web, read the most relevant results, and give an evidence-backed answer with [n] citations."
-    if guidance:
-        parts.append(f"For this message: {guidance}")
     if tools:
         parts.append(TOOL_NOTE.format(names=", ".join(tools)))
     if persona.nickname.strip():

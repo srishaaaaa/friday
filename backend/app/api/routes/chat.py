@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
@@ -23,6 +25,13 @@ async def approve(body: ApprovalBody, request: Request) -> dict:
     if not request.app.state.chat.approve(body.request_id, body.call_id, body.approve):
         raise AppError(404, "approval_not_found", "That action is no longer waiting for approval.")
     return {"ok": True}
+
+
+@router.post("/warmup")
+async def warmup(request: Request) -> dict:
+    """Fire-and-forget: pre-load the local model so the next reply starts fast."""
+    asyncio.create_task(request.app.state.chat.warmup())
+    return {"started": True}
 
 
 @router.post("/cancel")

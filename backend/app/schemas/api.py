@@ -47,6 +47,8 @@ class AppSettings(BaseModel):
     request_timeout: int = Field(120, ge=10, le=900)
     auto_retry: bool = False   # one retry on the SAME provider for transient errors (never another provider)
     streaming: bool = True     # UI: show tokens as they arrive vs. reveal when complete
+    reasoning: bool = False    # let "thinking" models reason silently before answering (much slower on CPU)
+    keep_alive_minutes: int = Field(30, ge=1, le=1440)  # keep the local model in memory between messages
     # tools
     tools_enabled: bool = True             # let the model call tools at all
     web_search: bool = True                # web_search + fetch_url (queries leave the device)
@@ -80,6 +82,8 @@ class AppSettingsPatch(BaseModel):
     request_timeout: int | None = Field(None, ge=10, le=900)
     auto_retry: bool | None = None
     streaming: bool | None = None
+    reasoning: bool | None = None
+    keep_alive_minutes: int | None = Field(None, ge=1, le=1440)
     tools_enabled: bool | None = None
     web_search: bool | None = None
     search_provider: Literal["duckduckgo", "ollama"] | None = None

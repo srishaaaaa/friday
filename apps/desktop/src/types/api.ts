@@ -64,6 +64,8 @@ export interface ChatMessage {
   statusText?: string | null
   tools?: ToolEvent[]
   sources?: Source[]
+  /** stored with each reply: time to the first visible word and to the end, in ms */
+  usage?: { first_token_ms?: number | null; total_ms?: number | null } | null
 }
 
 export interface AppSettings {
@@ -92,6 +94,8 @@ export interface AppSettings {
   request_timeout: number
   auto_retry: boolean
   streaming: boolean
+  reasoning: boolean
+  keep_alive_minutes: number
   tools_enabled: boolean
   web_search: boolean
   search_provider: 'duckduckgo' | 'ollama'

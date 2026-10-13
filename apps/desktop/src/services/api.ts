@@ -131,6 +131,8 @@ export const api = {
     return { ...(await r.json()), latencyMs: Math.round(performance.now() - t0) }
   },
   /** Real generation check for one model (never installs anything). */
+  /** Pre-load the local model + prompt cache in the background (no-op for cloud models). */
+  warmup: () => request<{ started: boolean }>('/api/chat/warmup', { method: 'POST' }),
   verifyModel: (provider: string, model: string) =>
     request<VerifyResult>('/api/models/verify', { method: 'POST', ...json({ provider, model }) }),
   approveTool: (request_id: string, call_id: string, approve: boolean) =>

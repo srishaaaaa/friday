@@ -77,9 +77,10 @@ class OllamaProvider(Provider):
 
     @staticmethod
     def auto_num_ctx(chars: int, max_tokens: int) -> int:
-        """Ollama's default context is small; size it to the prompt (~3.5 chars/token) + reply, power of two."""
+        """Context size for the request. Ollama RELOADS the model whenever num_ctx changes (~30-60 s on CPU), so this
+        stays at 8192 and only steps up (16K, 32K) for genuinely long prompts."""
         need = int(chars / 3.5) + max_tokens + 256
-        ctx = 4096
+        ctx = 8192
         while ctx < need and ctx < 32768:
             ctx *= 2
         return ctx
@@ -95,8 +96,10 @@ class OllamaProvider(Provider):
                 o[k] = opts[k]
         body: dict = {"model": model, "messages": msgs, "stream": True, "options": o}
         thought = answered = False  # reasoning seen / visible answer (or tool call) seen
-        if opts.get("think") is not None:  # only sent for models that report the "thinking" capability
+        if opts.get("think") is not None:  # False is safe for every model; True only where "thinking" is supported
             body["think"] = bool(opts["think"])
+        if opts.get("keep_alive"):
+            body["keep_alive"] = opts["keep_alive"]
         if tools:
             body["tools"] = [{"type": "function", "function": t} for t in tools]
         try:

@@ -7,6 +7,7 @@ import { ApiError, api } from '../services/api'
 import type { AppSettings, ModelsResponse, ProviderStatus } from '../types/api'
 import { isOllamaCloud, readiness } from '../utils/models'
 import { AIOrb } from './AIOrb'
+import { FridayLogo } from './FridayLogo'
 import { ModeSelector } from './Composer'
 import { ThemePicker } from './ThemePicker'
 import { Segmented, StatusDot } from './ui/primitives'
@@ -43,7 +44,7 @@ export function Onboarding({ settings, providers, models, prefs, onPrefs, onChan
           <motion.div key="intro" variants={staggerParent(0.16, 0.15)} initial="hidden" animate="show" exit={{ opacity: 0, scale: 0.98, transition: { duration: dur.ui } }}
             className="relative flex max-w-xl flex-col items-center text-center">
             <motion.div variants={{ hidden: { opacity: 0, scale: 0.6 }, show: { opacity: 1, scale: 1, transition: { duration: 0.9, ease: ease.out } } }}>
-              <AIOrb state="success" size={190} />
+              <FridayLogo size={190} />
             </motion.div>
             <motion.h1 variants={fadeUp} className="mt-6 pl-[0.42em] text-5xl font-extrabold tracking-[0.42em] text-ink" style={{ textShadow: '0 0 40px rgb(var(--accent-rgb) / 0.45)' }}>
               FRIDAY

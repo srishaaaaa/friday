@@ -6,6 +6,6 @@ export const BASE_SETTINGS: AppSettings = {
   system_prompt: '', max_tokens: 1024, theme: 'dark', memory_enabled: true, conversation_memory: true,
   personality: 'friendly', warmth: 'medium', humor: 'subtle', detail: 'balanced', tech_depth: 'adaptive', formatting: 'standard',
   suggestions: 'occasional', nickname: '', custom_instructions: '', temperature: null, top_p: null, context_window: null,
-  request_timeout: 120, auto_retry: false, streaming: true, tools_enabled: true, web_search: true, search_provider: 'duckduckgo',
+  request_timeout: 120, auto_retry: false, streaming: true, reasoning: false, keep_alive_minutes: 30, tools_enabled: true, web_search: true, search_provider: 'duckduckgo',
   allow_commands: false,
 }

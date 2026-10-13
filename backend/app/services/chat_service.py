@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import AsyncIterator, Callable
@@ -22,8 +23,8 @@ from app.providers.base import ChatMessage, Provider, ProviderError, ToolCall
 from app.providers.registry import ProviderRegistry
 from app.schemas.api import AppSettings, ChatRequest
 from app.services.attachments import as_prompt_block
-from app.services.prompting import Persona, build_system_prompt, detect_intent
-from app.services.routing_service import RouteDecision, decide_route
+from app.services.prompting import Persona, build_system_prompt, detect_intent, intent_guidance
+from app.services.routing_service import RouteDecision, decide_route, is_ollama_cloud
 from app.services.tools import TOOL_TIMEOUT, TOOLS, Tool, ToolContext, ToolResult, available_tools
 
 log = logging.getLogger("friday.chat")
@@ -103,6 +104,9 @@ def generation_options(prefs: AppSettings) -> dict:
         opts["top_p"] = prefs.top_p
     if prefs.context_window is not None:
         opts["num_ctx"] = prefs.context_window
+    if not prefs.reasoning:
+        opts["think"] = False  # hidden reasoning off: answers start immediately
+    opts["keep_alive"] = f"{prefs.keep_alive_minutes}m"
     return opts
 
 
@@ -114,6 +118,7 @@ class ChatService:
         self.files_dir = files_dir or (Path.home() / "Documents" / "FRIDAY")
         self._active: dict[str, asyncio.Event] = {}
         self._approvals: dict[tuple[str, str], asyncio.Future] = {}
+        self._warming: str | None = None
 
     def cancel(self, request_id: str) -> bool:
         ev = self._active.get(request_id)
@@ -212,8 +217,11 @@ class ChatService:
         # Stage: instruction assembly.
         persona = Persona(prefs.personality, prefs.warmth, prefs.humor, prefs.detail, prefs.tech_depth,
                           prefs.formatting, prefs.suggestions, prefs.nickname, prefs.custom_instructions)
-        system = build_system_prompt(prefs.system_prompt, persona, intent, memory_block(memories),
-                                     tools=[t.name for t in offered])
+        system = build_system_prompt(prefs.system_prompt, persona, memory_block(memories), tools=[t.name for t in offered])
+        guidance = intent_guidance(intent, [t.name for t in offered])
+        if guidance and history and history[-1].role == "user":  # model-facing only; the stored message is unchanged
+            last = history[-1]
+            history[-1] = ChatMessage("user", f"{last.content}\n\n(Response guidance: {guidance})", last.images)
 
         cancel = asyncio.Event()
         self._active[req.request_id] = cancel
@@ -243,6 +251,37 @@ class ChatService:
             kept.pop(0)
         return kept
 
+    # ---------------------------------------------------------------- warm-up
+    async def warmup(self) -> dict:
+        """Load the configured local Ollama model and pre-read the (stable) system prompt + tools, so the next
+        message skips both the model load and the prompt read. Cloud models need no warm-up."""
+        prefs = self.repo.get_settings()
+        model = prefs.ollama_model
+        provider = self.registry.get("ollama")
+        if not model or provider is None or is_ollama_cloud(model) or prefs.default_mode == "cloud":
+            return {"warmed": False, "reason": "nothing to warm"}
+        if self._warming == model:
+            return {"warmed": False, "reason": "already warming"}
+        self._warming = model
+        t0 = time.perf_counter()
+        try:
+            ctx = ToolContext(private=False, web_enabled=prefs.web_search, allow_commands=prefs.allow_commands,
+                              search_provider=prefs.search_provider, get_search_key=lambda: None, files_dir=self.files_dir)
+            offered = available_tools(ctx) if prefs.tools_enabled else []
+            persona = Persona(prefs.personality, prefs.warmth, prefs.humor, prefs.detail, prefs.tech_depth,
+                              prefs.formatting, prefs.suggestions, prefs.nickname, prefs.custom_instructions)
+            memories = [m.content for m in self.repo.list_memories(only_enabled=True)] if prefs.memory_enabled else []
+            system = build_system_prompt(prefs.system_prompt, persona, memory_block(memories), tools=[t.name for t in offered])
+            opts = generation_options(prefs)
+            async for _ in provider.stream([ChatMessage("user", "hi")], model, system, 1, options=opts,
+                                           tools=[t.schema() for t in offered] or None):
+                pass
+            return {"warmed": True, "model": model, "ms": round((time.perf_counter() - t0) * 1000)}
+        except ProviderError as exc:
+            return {"warmed": False, "model": model, "error": exc.code}
+        finally:
+            self._warming = None
+
     # ---------------------------------------------------------------- approvals
     def approve(self, request_id: str, call_id: str, approved: bool) -> bool:
         fut = self._approvals.get((request_id, call_id))
@@ -269,6 +308,7 @@ class ChatService:
         status, error = "ok", None
         tool_log: list[dict] = []
         sources: list[dict] = []
+        t0, first_ms = time.perf_counter(), None
         yield sse("meta", {"conversation_id": p.conversation_id, "provider": p.route.provider_id,
                            "model": p.route.model, "mode": p.route.mode, "category": p.route.category,
                            "reason": p.route.reason, "leaves_device": p.route.leaves_device,
@@ -288,6 +328,8 @@ class ChatService:
                                                    options=opts, tools=schemas)
                         async for chunk in iter_with_cancel(source, p.cancel):
                             if chunk.kind == "delta":
+                                if first_ms is None:
+                                    first_ms = round((time.perf_counter() - t0) * 1000)
                                 buf.append(chunk.text)
                                 step_text.append(chunk.text)
                                 yield sse("delta", {"text": chunk.text})
@@ -344,6 +386,7 @@ class ChatService:
             error = {"code": "internal_error", "message": "Unexpected error while generating.", "retryable": True}
 
         content = "".join(buf).strip()
+        usage = {**(usage or {}), "first_token_ms": first_ms, "total_ms": round((time.perf_counter() - t0) * 1000)}
         msg = self._persist(p, content, status, usage, tool_log, sources) if (content or status == "cancelled") else None
         self._active.pop(p.request_id, None)
         if error:

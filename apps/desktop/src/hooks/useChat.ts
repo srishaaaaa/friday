@@ -5,6 +5,9 @@ import type {
 } from '../types/api'
 
 const rid = () => crypto.randomUUID().replaceAll('-', '')
+const WARM_KEYS = new Set(['ollama_model', 'default_mode', 'system_prompt', 'personality', 'warmth', 'humor', 'detail', 'tech_depth',
+  'formatting', 'suggestions', 'nickname', 'custom_instructions', 'memory_enabled', 'tools_enabled', 'web_search', 'allow_commands',
+  'reasoning', 'keep_alive_minutes', 'context_window', 'temperature', 'top_p'])
 
 function upsertTool(list: ToolEvent[] | undefined, t: ToolWire, state: ToolEvent['state']): ToolEvent[] {
   const next: ToolEvent = { id: t.id, name: t.name, label: t.label, detail: t.detail, state, summary: t.summary, args: t.args, private: t.private }
@@ -63,7 +66,7 @@ export function useChat() {
 
   useEffect(() => {
     void (async () => {
-      try { setSettings(await api.settings()) } catch (e) { setError(toErr(e)) }
+      try { setSettings(await api.settings()); void api.warmup().catch(() => undefined) } catch (e) { setError(toErr(e)) }
       void refreshProviders()
     })()
   }, [refreshProviders])
@@ -200,7 +203,12 @@ export function useChat() {
   }, [])
 
   const updateSettings = useCallback(async (patch: Partial<AppSettings>) => {
-    try { setSettings(await api.patchSettings(patch)); void refreshProviders(); return true } catch (e) { setError(toErr(e)); return false }
+    try {
+      setSettings(await api.patchSettings(patch)); void refreshProviders()
+      // Anything that changes the model or its standing prompt: pre-load again so the next reply starts fast.
+      if (Object.keys(patch).some((k) => WARM_KEYS.has(k))) void api.warmup().catch(() => undefined)
+      return true
+    } catch (e) { setError(toErr(e)); return false }
   }, [refreshProviders])
 
   const setMode = useCallback((m: Mode) => updateSettings({ default_mode: m }), [updateSettings])
